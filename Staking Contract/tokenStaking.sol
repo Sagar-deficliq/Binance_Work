@@ -1,6 +1,8 @@
-//"SPDX-License-Identifier: UNLICENSED"
+/**
+ *Submitted for verification at BscScan.com on 2021-07-05
+*/
 
-pragma solidity ^0.6.6;
+pragma solidity ^0.4.24;
 
 /**
  * @title SafeMath
@@ -62,30 +64,30 @@ library SafeMath {
  * @title ICliq
  * @dev   Contract interface for token contract 
  */
-abstract contract ICliq {
-    function name() public  pure virtual returns (string memory);
-    function symbol() public pure virtual returns (string memory);
-    function decimals() public pure virtual returns (uint8);
-    function totalSupply() public pure virtual returns (uint256);
-    function balanceOf(address) public pure virtual returns (uint256);
-    function allowance(address, address) public pure virtual returns (uint256);
-    function transfer(address, uint256) public pure virtual returns (bool);
-    function transferFrom(address, address, uint256) public pure virtual returns (bool);
-    function approve(address , uint256) public pure virtual returns (bool);
-    function burn(uint256) public pure virtual;
-    function mint(uint256) public pure virtual;
-    function getContractBNBBalance() public pure virtual returns(uint256);
+contract ICliq {
+    function name() public pure returns (string memory);
+    function symbol() public pure returns (string memory);
+    function decimals() public pure returns (uint8);
+    function totalSupply() public pure returns (uint256);
+    function balanceOf(address) public pure returns (uint256);
+    function allowance(address, address) public pure returns (uint256);
+    function transfer(address, uint256) public pure returns (bool);
+    function transferFrom(address, address, uint256) public pure returns (bool);
+    function approve(address , uint256) public pure returns (bool);
+    function burn(uint256) public pure;
+    function mint(uint256) public pure returns(bool);
+    function getContractBNBBalance() public pure returns(uint256);
  }
 
 /**
- * @title DefiCliqTokenStaking
- * @dev   DefiCliqTokenStaking Contract for token staking
+ * @title Cliq Staking
+ * @dev   Staking Contract for token staking
  */
-contract DefiCliqTokenStaking {
+contract CliqStaking {
     
   using SafeMath for uint256;
   address private _owner;                                           // variable for Owner of the Contract.
-  uint256 private _withdrawTime;                                    // variable to manage withdraw time for Token
+  uint256 private _withdrawTime;                                    // variable to manage withdraw time for BNB and Token
   uint256 constant public PERIOD_SILVER            = 30;            // variable constant for time period managemnt
   uint256 constant public PERIOD_GOLD              = 60;            // variable constant for time period managemnt
   uint256 constant public PERIOD_PLATINUM          = 90;            // variable constant for time period managemnt
@@ -99,7 +101,7 @@ contract DefiCliqTokenStaking {
   uint256 public TOKEN_PENALTY_PERCENT_GOLD        = 2367960;       // variable constant to manage token penalty percentage for silver
   uint256 public TOKEN_PENALTY_PERCENT_PLATINUM    = 5608715;       // variable constant to manage token penalty percentage for silver
   
-  // events to handle staking pause or unpause for token
+  // events to handle staking pause or unpause for token and BNB
   event Paused();
   event Unpaused();
   
@@ -148,25 +150,20 @@ contract DefiCliqTokenStaking {
   */
   
   // constructor to declare owner of the contract during time of deploy  
-  constructor(address owner) public {
-     _owner = owner;
+  constructor() public {
+     _owner = msg.sender;
   }
   
   // Interface declaration for contract
-  ICliq public icliq;
+  ICliq icliq;
     
   // function to set Contract Address for Token Transfer Functions
-  function setTokenContractAddress(address tokenContractAddress) external onlyOwner returns(bool){
+  function setContractAddress(address tokenContractAddress) external onlyOwner returns(bool){
     icliq = ICliq(tokenContractAddress);
     return true;
   }
   
-//   // function to get Token Contract Address
-//   function getTokenContractAddress() public view returns(address){
-//     return icliq;
-//   }
-  
-  /*
+   /*
   * ----------------------------------------------------------------------------------------------------------------------------
   * Owner functions of get value, set value and other Functionality
   * ----------------------------------------------------------------------------------------------------------------------------
@@ -175,7 +172,7 @@ contract DefiCliqTokenStaking {
   // function to add token reward in contract
   function addTokenReward(uint256 token) external onlyOwner returns(bool){
     _ownerTokenAllowance = _ownerTokenAllowance.add(token);
-    icliq.transferFrom(msg.sender, address(this), _ownerTokenAllowance);
+    icliq.transferFrom(msg.sender, address(this), token);
     return true;
   }
   
@@ -183,7 +180,7 @@ contract DefiCliqTokenStaking {
   function withdrawAddedTokenReward(uint256 token) external onlyOwner returns(bool){
     require(token < _ownerTokenAllowance,"Value is not feasible, Please Try Again!!!");
     _ownerTokenAllowance = _ownerTokenAllowance.sub(token);
-    icliq.transferFrom(address(this), msg.sender, _ownerTokenAllowance);
+    icliq.transferFrom(address(this), msg.sender, token);
     return true;
   }
   
@@ -191,7 +188,7 @@ contract DefiCliqTokenStaking {
   function getTokenReward() public view returns(uint256){
     return _ownerTokenAllowance;
   }
- 
+  
   // function to pause Token Staking
   function pauseTokenStaking() public onlyOwner {
     tokenPaused = true;
@@ -219,14 +216,12 @@ contract DefiCliqTokenStaking {
      TOKEN_PENALTY_PERCENT_PLATINUM = platinum;
      return true;
   }
-
+ 
   /*
   * ----------------------------------------------------------------------------------------------------------------------------
   * Variable, Mapping for Token Staking Functionality
   * ----------------------------------------------------------------------------------------------------------------------------
   */
-  
-  mapping (address => uint256) private _balances;
   
   // mapping for users with id => address Staking Address
   mapping (uint256 => address) private _tokenStakingAddress;
@@ -273,11 +268,10 @@ contract DefiCliqTokenStaking {
   // modifier to check the user for staking || Re-enterance Guard
   modifier tokenStakeCheck(uint256 tokens, uint256 timePeriod){
     require(tokens > 0, "Invalid Token Amount, Please Try Again!!! ");
-    require(tokens <= _balances[msg.sender], "Insufficient Token Funds, Please Try Again!!!");
     require(timePeriod == PERIOD_SILVER || timePeriod == PERIOD_GOLD || timePeriod == PERIOD_PLATINUM, "Enter the Valid Time Period and Try Again !!!");
     _;
   }
-    
+  
   /*
   * ------------------------------------------------------------------------------------------------------------------------------
   * Functions for Token Staking Functionality
@@ -412,7 +406,7 @@ contract DefiCliqTokenStaking {
   }
   
   // function to get Token staking id by address
-  function getTokenStakingIdByAddress(address add) external view returns(uint256[] memory){
+  function getTokenStakingIdByAddress(address add) external view returns(uint256[]){
     require(add != address(0),"Invalid Address, Pleae Try Again!!!");
     return _tokenStakingId[add];
   }
